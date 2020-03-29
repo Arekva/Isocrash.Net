@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ContentModelStore">
+    <e p="C:\Users\Arthur\.Rider2019.3\system\extResources" t="IncludeRecursive" />
+    <e p="C:\Users\Arthur\.Rider2019.3\system\resharper-host\local\Transient\ReSharperHost\v193\SolutionCaches\_Isocrash.Net.-832713728.00" t="ExcludeRecursive" />
+    <e p="C:\Users\Arthur\source\repos\Isocrash.Net\Isocrash.Net" t="IncludeRecursive">
+      <e p="Auth" t="Include">
+        <e p="Auth.cs_tofix" t="Include" />
+        <e p="AuthInfo.cs" t="Include" />
+      </e>
+      <e p="bin" t="ExcludeRecursive" />
+      <e p="Client.cs" t="Include" />
+      <e p="Command" t="Include">
+        <e p="BuiltinCommands.cs" t="Include" />
+        <e p="Command.cs" t="Include" />
+        <e p="CommandFire.cs" t="Include" />
+        <e p="RegisterCommand.cs" t="Include" />
+      </e>
+      <e p="Data" t="Include">
+        <e p="NetData.cs" t="Include" />
+        <e p="NetEditBlock.cs" t="Include" />
+        <e p="NetMessage.cs" t="Include" />
+        <e p="NetObject.cs" t="Include" />
+        <e p="NetPlayer.cs" t="Include" />
+        <e p="NetPlayerHandshake.cs" t="Include" />
+      </e>
+      <e p="FileSystem.cs" t="Include" />
+      <e p="Folder.cs" t="Include" />
+      <e p="Formatter.cs" t="Include" />
+      <e p="Isocrash.Net.csproj" t="IncludeRecursive" />
+      <e p="Isocrash.Net.sln" t="IncludeFlat" />
+      <e p="Logger.cs" t="Include" />
+      <e p="LogType.cs" t="Include" />
+      <e p="obj" t="ExcludeRecursive" />
+      <e p="packages" t="ExcludeRecursive" />
+      <e p="packages.config" t="Include" />
+      <e p="Player.cs" t="Include" />
+      <e p="Plugin.cs" t="Include" />
+      <e p="Properties" t="Include">
+        <e p="AssemblyInfo.cs" t="Include" />
+      </e>
+      <e p="Server.cs" t="Include" />
+    </e>
+  </component>
+</project>

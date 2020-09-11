@@ -21,12 +21,54 @@ namespace Isocrash.Net
         private static Thread _dataThread;
         private static List<NetObject> _enqueuedData = new List<NetObject>();
         private static TcpClient _client;
-        private static Logger _clientLogger = new Logger(Console.WriteLine,Console.WriteLine,Console.WriteLine,Console.WriteLine);
-        private static List<NetObject> _receivedData = new List<NetObject>();
-        
+        public static Logger _clientLogger = new Logger(ConsoleLog, ConsoleLogWarning, ConsoleLogError, ConsoleLogException);
+        public static List<NetObject> _receivedData = new List<NetObject>();
+
         #endregion
-        
+
         #region Public Methods
+        #region Server Logger Setters
+        /// <summary>
+        /// Set a new logger used by the server.
+        /// </summary>
+        /// <param name="info">The function used to log information</param>
+        /// <param name="warning">The function used to log warnings</param>
+        /// <param name="error">The function used to log errors</param>
+        /// <param name="exception">The function used to log exceptions</param>
+        public static void SetClientLogger(
+            Logger.LoggerCallback info, Logger.LoggerCallback warning,
+            Logger.LoggerCallback error, Logger.LoggerCallback exception)
+        {
+            _clientLogger = new Logger(info, warning, error, exception);
+        }
+        /// <summary>
+        /// Set a new function for the logger
+        /// </summary>
+        /// <param name="type">The type of log the function will apply on</param>
+        /// <param name="function">The function used to log the type</param>
+        public static void SetClientLogger(LogType type, Logger.LoggerCallback function)
+        {
+            switch (type)
+            {
+                case LogType.Info:
+                    _clientLogger._infoCallback = function;
+                    break;
+                case LogType.Warning:
+                    _clientLogger._warningCallback = function;
+                    break;
+                case LogType.Error:
+                    _clientLogger._errorCallback = function;
+                    break;
+                case LogType.Exception:
+                    _clientLogger._exceptionCallback = function;
+                    break;
+                default: // .Info:
+                    _clientLogger._infoCallback = function;
+                    break;
+            }
+        }
+        #endregion
+
         /// <summary>
         /// Set nickname (Offline); Works only while not connected to server.
         /// </summary>
@@ -56,7 +98,7 @@ namespace Isocrash.Net
         /// <summary>
         /// Get and clear the the received data.
         /// </summary>
-        public static ReadOnlyCollection<NetObject> ReceivedData
+        /*public static ReadOnlyCollection<NetObject> ReceivedData
         {
             get
             {
@@ -64,7 +106,7 @@ namespace Isocrash.Net
                 _receivedData.Clear();
                 return objs;
             }
-        }
+        }*/
 
         /// <summary>
         /// Connect to server, returns if success
@@ -83,14 +125,12 @@ namespace Isocrash.Net
                 NetPlayerHandshake handshake = new NetPlayerHandshake(Client.Nickname, Client.AuthToken);
                 handshakesent = true;
                 NetObject.SendContent(handshake, _client.Client);
-
                 _dataThread = new Thread(DoDataForThread)
                 {
                     Priority = ThreadPriority.AboveNormal
                 };
                 _dataThread.Start();
-                
-                    
+
                 Connected = true;
                 return true;
             }
@@ -104,6 +144,69 @@ namespace Isocrash.Net
                 return false;
             }
         }
+
+        public static void Log(object message)
+        {
+            _clientLogger.Log(message);
+        }
+        public static void LogWarning(object message)
+        {
+            _clientLogger.LogWarning(message);
+        }
+        public static void LogError(object message)
+        {
+            _clientLogger.LogError(message);
+        }
+        public static void LogException(object message)
+        {
+            _clientLogger.LogException(message);
+        }
+
+        #region Console Logging Methods
+        /// <summary>
+        /// Console information logging
+        /// </summary>
+        /// <param name="message">The message to log</param>
+        private static void ConsoleLog(object message)
+        {
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine(message);
+            Console.ResetColor();
+        }
+
+        /// <summary>
+        /// Console warning logging
+        /// </summary>
+        /// <param name="message">The message to log</param>
+        private static void ConsoleLogWarning(object message)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine(message);
+            Console.ResetColor();
+        }
+
+        /// <summary>
+        /// Console error logging
+        /// </summary>
+        /// <param name="message">The message to log</param>
+        private static void ConsoleLogError(object message)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkRed;
+            Console.WriteLine(message);
+            Console.ResetColor();
+        }
+
+        /// <summary>
+        /// Console exception logging
+        /// </summary>
+        /// <param name="message">The message to log</param>
+        private static void ConsoleLogException(object message)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine(message);
+            Console.ResetColor();
+        }
+        #endregion
 
         /// <summary>
         /// Disconnects from server
@@ -125,12 +228,12 @@ namespace Isocrash.Net
         }
         private static async Task DoData()
         {
-            _clientLogger.LogWarning("Connected to server");
+            _clientLogger.Log("Connected to server");
 
             Task.Run(() => SendDataToServer());
             await GatherServerData();
             
-            _clientLogger.LogWarning("Disconnected from server");
+            _clientLogger.Log("Disconnected from server");
         }
         private static async Task GatherServerData()
         {
@@ -138,7 +241,9 @@ namespace Isocrash.Net
             {
                 while (Connected)
                 {
+                    
                     _receivedData.Add(await GetDataAsync(_client.Client));
+                    //_clientLogger.Log("ADDED NEW OBJECT DATA");
                 }
             }
             
@@ -165,12 +270,13 @@ namespace Isocrash.Net
             }
             
             //Disconnection
-            catch {}
+            catch(Exception e) { _clientLogger.LogError(e);}
         }
         private static async Task<NetObject> GetDataAsync(Socket client)
         {
             return await Task.Run(() =>
             {
+                //_clientLogger.Log("Waiting for data");
                 byte[] sizeInfo = new byte[4];
                 Int32 totalread = 0, currentread = 0;
                 currentread = totalread = client.Receive(sizeInfo);
@@ -213,6 +319,7 @@ namespace Isocrash.Net
                 }
                 
                 string msg = System.Text.Encoding.Unicode.GetString(data);
+                //_clientLogger.Log("Got new object");
                 return NetObject.GetContent(msg);
             });
         }

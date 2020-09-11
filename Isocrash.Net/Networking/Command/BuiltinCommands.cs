@@ -5,12 +5,14 @@ using Isocrash.Net;
 
 namespace Isocrash.Net
 {
-    public class BuiltinCommands
+    public static class BuiltinCommands
     {
         [RegisterCommand("help", "Show all commands available", "Use /help [command] to show command help (i.e. /help say)")]
         public static bool Help(Player sender, params string[] args)
         {
             string msg = "";
+
+            //msg.Split(' ', ' ');
             // Show command help
             if (args.Length > 0)
             {

@@ -7,15 +7,20 @@ namespace Isocrash.Net
 {
     public static class FileSystem
     {
-        private static string[] _specialDirectories =
-            new string[4]//[(int) Enum.GetValues(typeof(Folder)).Cast<Folder>().Last();
+        private static string[] _specialDirectories
+        {
+            get
             {
-                Directory.GetCurrentDirectory(),
-                "/world/",
-                "/plugins/",
-                "/settings"
-            };
-        
+                return new string[4]
+                    {
+                        Directory.GetCurrentDirectory(),
+                        "/world/",
+                        "/plugins/",
+                        "/settings"
+                    };
+            }
+        }
+
         public static string RootFolder
         {
             get { return Directory.GetCurrentDirectory(); }

@@ -45,6 +45,7 @@ namespace Isocrash.Net
         private static List<Command> _commands { get; set; } = new List<Command>(8);
         #endregion
         
+        
         #region Methods
 
         /// <summary>
@@ -107,6 +108,7 @@ namespace Isocrash.Net
             return null;
         }
         #endregion
+        
     }
 }
 

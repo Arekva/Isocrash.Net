@@ -2,11 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using Isocrash.Net.Gamelogic;
+using ThreadPriority = System.Threading.ThreadPriority;
+
 //using Mono.Data.Sqlite;
 
 namespace Isocrash.Net
@@ -19,16 +24,15 @@ namespace Isocrash.Net
         /// If not, offline player are able to come.
         /// </summary>
         public static bool UseAuth { get; set; } = false;
-
         /// <summary>
         /// The server tick rate (game state snapshot rate)
         /// </summary>
-        public static int TickRate { get; set; } = 60;
+        public static int TickRate { get; set; } = 20;
         /// <summary>
         /// The IP Address the server is listening towards
         /// </summary>
         public static IPAddress IP { get; private set; } = IPAddress.Any;
-
+        public static bool Integrated { get; private set; } = false;
         /// <summary>
         /// The port the server is listening towards
         /// </summary>
@@ -47,10 +51,12 @@ namespace Isocrash.Net
         #endregion
         
         #region Internal Attributes
-        internal static List<Player> _connectedPlayers = new List<Player>(); //players
+        internal static List<Player> _connectedPlayers { get; set; } = new List<Player>(); //players
         #endregion
         
         #region Private Attributes
+
+        private static bool _dataGatherPaused = false;
 
         private static Thread playerDataThread;
         private static Thread snapshotThread;
@@ -59,9 +65,19 @@ namespace Isocrash.Net
         private static Logger ServerLogger = new Logger(ConsoleLog, ConsoleLogWarning,ConsoleLogError,ConsoleLogException);
 
         private static bool dataCallbacksDone = false;
+        
+        private static readonly Dictionary<NetObject, Player> _receivedData = new Dictionary<NetObject, Player>();
         #endregion
 
         #region Public Methods
+
+        public static Ticket[] GetIntegratedTickets()
+        {
+            return Integrated ? Ticket._tickets.ToArray() : null;
+        }
+
+
+
         #region Server Logger Setters
         /// <summary>
         /// Set a new logger used by the server.
@@ -106,6 +122,11 @@ namespace Isocrash.Net
             }
         }
         #endregion
+
+        public static void SetIntegrated(bool value)
+        {
+            Integrated = value;
+        }
         
         #region Start Methods
         /// <summary>
@@ -183,10 +204,49 @@ namespace Isocrash.Net
 
                 // Registers all commands, internals and plugins as well.
                 CommandFire.FireRegistery();
+
+                ItemDef[] items = ItemCache.LoadItems();
+                for (short i = 0; i < items.Length; i++)
+                {
+                    //LogWarning("Loaded item " + items[i]);
+                }
+
+                //Console.CursorVisible = false;
+                Stopwatch worldSW = new Stopwatch();
+                worldSW.Start();
+                World.StartDebug();
+
+                uint startnum = (uint)(Math.Pow(World.StartRadius * 2 + 1,2));
+                string loadmode = "Generating ";
+                if (File.Exists(FileSystem.GetSpecialDirectory(Folder.Save).FullName + "c0_0.json")) loadmode = "Loading ";
+
+                while (!World.StartGenerationDone)
+                {
+                   //Console.SetCursorPosition(0, 0);
+                   Log(loadmode + $"world : {Math.Round((Ticket._tickets.Count / (float)startnum) * 100,0)}% ({Process.GetCurrentProcess().PrivateMemorySize64 / (int)1e6} MB) | {Ticket._tickets.Count} chunks loaded");
+                   Thread.Sleep(100);
+                }
+                worldSW.Stop();
+                 /*Task.Run(() => {
+
+                    Ticket[] ticket = Ticket._tickets.ToArray();
+                    for (int i = 0; i < ticket.Length; i++)
+                    {
+                        ticket[i].Unload();
+                    }
+                });*/
+                //Console.SetCursorPosition(0, 0);
+                Log($"Loading world : 100% ({Process.GetCurrentProcess().PrivateMemorySize64 / (int)1e6} MB)");
+                //Console.CursorVisible = true;
+                //Console.SetCursorPosition(0,1);
+                //Console.WriteLine("Load done in " + Math.Round(worldSW.Elapsed.TotalMilliseconds,2) + "ms");
+
+                
+                
                 _listener = new TcpListener(listenAddress);
                 _listener.Start();
                 Running = true;
-
+                Log("Isocrash server started on port " + Port);
                 playerDataThread = new Thread(StartPlayerLoops)
                 {
                     Priority = ThreadPriority.AboveNormal, IsBackground = true
@@ -198,11 +258,13 @@ namespace Isocrash.Net
                     Priority = ThreadPriority.Highest, IsBackground = true
                 };
                 snapshotThread.Start();
+
+                
                 return true;
             }
             catch (Exception e)
             {
-                LogException("Unable to start server: " + e.Message);
+                LogException("[Exception] Unable to start server " + e);
                 
                 return false;
             }
@@ -249,8 +311,9 @@ namespace Isocrash.Net
         /// </summary>
         public static void Shutdown()
         {
-            playerDataThread.Abort();
-            snapshotThread.Abort();
+            World._worldThread?.Abort();
+            playerDataThread?.Abort();
+            snapshotThread?.Abort();
             _listener?.Stop();
             _listener = null;
             Running = false;
@@ -319,24 +382,79 @@ namespace Isocrash.Net
         }
         #endregion
 
+        private static Stopwatch TickTime = new Stopwatch();
         private static void Snapshot()
         {
-            try
+            int frame = 0;
+            while (Running)
             {
-                while (Running)
+                try
                 {
+                    KeyValuePair<NetObject,Player>[] data = _receivedData.ToArray();
+                    _receivedData.Clear();
+
+                    for (int i = 0; i < data.Length; i++)
+                    {
+                        Player player = data[i].Value;
+                        NetObject obj = data[i].Key;
+
+                        Vector3Int p = player.Position;
+                        
+                        if (obj is NetInput input)
+                        {
+                            //Console.WriteLine(input.Key);
+                            
+
+                            switch (input.Key)
+                            {
+                                case ConsoleKey.Z:
+                                    p = new Vector3Int(p.X, p.Y, p.Z + 1);
+                                    break;
+                                case ConsoleKey.S:
+                                    p = new Vector3Int(p.X, p.Y, p.Z - 1);
+                                    break;
+                                case ConsoleKey.D:
+                                    p = new Vector3Int(p.X + 1, p.Y, p.Z);
+                                    break;
+                                case ConsoleKey.Q:
+                                    p = new Vector3Int(p.X - 1, p.Y, p.Z);
+                                    break;
+                            }
+
+                            if(p != player.Position)
+                            {
+                                player.SetPosition(p);
+                            }
+                        }
+
+                        else if(obj is NetMessage message)
+                        {
+                            message.WriteConsole();
+                        }
+                    }
+                    TickTime.Start();
+                    World.Tick();
+                    TickTime.Stop();
+                    //Log("Tick time : " + Math.Round(TickTime.Elapsed.TotalMilliseconds, 2) + " ms");
+                    TickTime.Reset();
+
+                    if(frame % TickRate == 0)
+                        GC.Collect();
+
                     // Send data to player
                     SendAllEnqueuedData();
+                    frame++;
+                    int timeToSleep = (int) ((1.0F / TickRate * 1000.0F));
 
-                    int timeToSleep = (int) (1.0F / TickRate);
-                    
                     Thread.Sleep(timeToSleep);
-                }
-                
-                
-            }
 
-            catch{}
+                    
+                }
+                catch (Exception e)
+                {
+                    LogException(e);
+                }
+            } 
         }
 
         private static void StartPlayerLoops()
@@ -411,7 +529,26 @@ namespace Isocrash.Net
                 //}
                  
                 LogWarning(newPlayer.Nickname + " (" + newPlayer.Identifier + ") connected");
+                newPlayer.SetPosition(0,64,0);
+                /*for (int i = 0; i < 10; i++)
+                {
+                    NetObject.SendContent(new NetMessage("test"), client.Client);
+                }*/
 
+
+                foreach (Ticket ticket in Ticket._tickets)
+                {
+                    //Log("Sending chunk " + ticket.Position.X + "," + ticket.Position.Y);
+                    DictionnaryChunk dc = ticket.Chunk.ToDictionnary();
+                    NetChunk nc = new NetChunk(dc, ticket.Position);
+                    newPlayer.EnqueueData(nc);
+                    //NetObject.SendContent(nc, client.Client);
+                }
+
+                //Ticket.CreateTicket(newPlayer.Position.X, newPlayer.Position.Y, 31, TicketType.Player,
+                //TicketPreviousDirection.None, true);
+
+                newPlayer.EnqueueData(new NetMessage("msg", ConsoleColor.DarkCyan));
                 await GatherPlayerData(newPlayer);
 
                 LogWarning(newPlayer.Nickname + " disconnected");
@@ -430,12 +567,13 @@ namespace Isocrash.Net
                 while (Running)
                 {
                     NetObject obj = await GetDataAsync(player.TCP.Client);
-                    obj.Receive();
+                    _receivedData.Add(obj, player);
                 }
             }
 
             catch (Exception e)
             {
+                LogError(e);
                 player.Disconnect();
             }
         }

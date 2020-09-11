@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using Isocrash.Net.Gamelogic;
 
 namespace Isocrash.Net
 {
@@ -22,6 +23,11 @@ namespace Isocrash.Net
         /// The <see cref="TcpClient"/> of the player
         /// </summary>
         public TcpClient TCP { get; }
+        
+        /// <summary>
+        /// The world position of the player
+        /// </summary>
+        public Vector3Int Position { get; set; }
 
         /// <summary>
         /// Creates an online (authenticated) player
@@ -33,6 +39,7 @@ namespace Isocrash.Net
             this.Nickname = infos.Nickname;
             this.Identifier = infos.Identifier;
             this.TCP = clientConnection;
+            Server._connectedPlayers.Add(this);
         }
         /// <summary>
         /// Creates an offline player
@@ -50,6 +57,8 @@ namespace Isocrash.Net
             }
 
             this.TCP = clientConnection;
+
+            Server._connectedPlayers.Add(this);
         }
         
         /// <summary>
@@ -79,14 +88,12 @@ namespace Isocrash.Net
             TCP.Close();
             Server._connectedPlayers.Remove(this);
         }
-        
         internal void EnqueueData(NetObject data)
         {
             if (data == null) return;
             
             _enqueuedObjects.Add(data);
         }
-
         internal void SendEnqueuedData()
         {
             NetObject[] netObjects = _enqueuedObjects.ToArray();
@@ -94,6 +101,22 @@ namespace Isocrash.Net
             {
                 NetObject.SendContent(netObjects[i], this.TCP.Client);
             }
+            _enqueuedObjects.Clear();
+        }
+
+        public void SetPosition(int x, int y, int z)
+        {
+            SetPosition(new Vector3Int(x,y,z));
+        }
+        public void SetPosition(Vector3Int newPosition)
+        {
+            this.Position = newPosition;
+            //UpdateTickets();
+        }
+
+        private void UpdateTickets()
+        {
+            Ticket.CreateTicket(this.Position.X, this.Position.Y, 31, TicketType.Player, TicketPreviousDirection.None, propagates:true);
         }
     }
 }

@@ -21,7 +21,6 @@ namespace Isocrash.Net
         #region Private Attributes
         private static Dictionary<Type, ReceiveCallback> _callbacks = new Dictionary<Type, ReceiveCallback>();
         #endregion
-        
 
         #region Public Methods
         /// <summary>
